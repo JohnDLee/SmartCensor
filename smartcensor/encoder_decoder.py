@@ -249,6 +249,7 @@ def train(train_data, dev_data):
             output = model.translate_beam(fwords)
             dev_outputs.append(output)
             if line_num < 10:
+                print(str(line_num) + " original: " + fwords)
                 print(str(line_num) + ": " + ' '.join(output), file=sys.stderr, flush=True)
         print("End predictions")
 
