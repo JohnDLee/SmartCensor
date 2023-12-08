@@ -5,12 +5,27 @@ from layers import *
 from utils import *
 import bleu
 
+# download required nltk packages
+import nltk
+import ssl
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
+nltk.download('popular')
+from nltk.tokenize import word_tokenize
+
+
 torch.set_default_device('cpu') 
 #torch.set_default_device('cuda') 
 
 # The maximum length of any sentence, including <BOS> and <EOS>
-max_len = 256
+max_len = 64
 
+# Feed Forward Network module
 class FFN(torch.nn.Module):
     def __init__(self, idims, hdims, odims, residual=True):
         super().__init__()
@@ -26,8 +41,8 @@ class FFN(torch.nn.Module):
         else:
             return out
 
+# Multi head self attention module
 class MHSelfAttentionLayer(torch.nn.Module):
-    """Multi-head self-attention layer."""
     def __init__(self, nheads, dims):
         super().__init__()
         self.heads = torch.nn.ModuleList([SelfAttentionLayer(dims) for h in range(nheads)])
@@ -35,6 +50,7 @@ class MHSelfAttentionLayer(torch.nn.Module):
     def forward(self, inp):
         return sum([h(inp) for h in self.heads]) / len(self.heads)
 
+# A transformer is made up of a self attention layer followed up by a feed forward network
 class TransformerBlock(torch.nn.Module):
     def __init__(self, dims):
         super().__init__()
@@ -43,26 +59,29 @@ class TransformerBlock(torch.nn.Module):
     def forward(self, fencs):
         return self.ffn(self.att(fencs))
     
+# encoder portion of the detoxifier
 class Encoder(torch.nn.Module):
     def __init__(self, vocab_size, dims):
         super().__init__()
         self.emb = Embedding(vocab_size, dims) 
         self.pos = Embedding(max_len, dims)    
 
+        # 4 layer transformer encoder
         self.layers = torch.nn.Sequential(
-            torch.nn.Dropout(0.1),
+            #torch.nn.Dropout(0.1),
             MHSelfAttentionLayer(4, dims),
             FFN(dims, 4 * dims, dims),
-            torch.nn.Dropout(0.1),
+            #torch.nn.Dropout(0.1),
             MHSelfAttentionLayer(4, dims),
             FFN(dims, 4 * dims, dims),
-            torch.nn.Dropout(0.1),
+            #torch.nn.Dropout(0.1),
             MHSelfAttentionLayer(4, dims),
             FFN(dims, 4 * dims, dims),
-            torch.nn.Dropout(0.1),
+            #torch.nn.Dropout(0.1),
             MHSelfAttentionLayer(4, dims),
             FFN(dims, 4 * dims, dims),
-            torch.nn.Dropout(0.1))
+            #torch.nn.Dropout(0.1)
+            )
 
     def forward(self, fnums):
         femb = self.emb(fnums)
@@ -70,6 +89,7 @@ class Encoder(torch.nn.Module):
         fencs = femb + fpos
         return self.layers(fencs)
 
+# decoder portion of the detoxifier
 class Decoder(torch.nn.Module):    
     def __init__(self, dims, vocab_size):
         super().__init__()
@@ -115,6 +135,8 @@ class Model(torch.nn.Module):
         self.encoder = Encoder(len(fvocab), dims)
         self.decoder = Decoder(dims, len(evocab))
 
+        self.beam_k = 4
+
     def logprob(self, fwords, ewords):
         """Return the log-probability of a sentence pair.
 
@@ -159,6 +181,38 @@ class Model(torch.nn.Module):
             ewords.append(eword)
         return ewords
 
+    def translate_beam(self, fwords):
+        """Translate a sentence using beam search.
+
+        Arguments:
+            fwords: source sentence (list of str)
+
+        Return:
+            ewords: target sentence (list of str)
+        """
+        fnums = torch.tensor([self.fvocab.numberize(f) for f in fwords])
+        fencs = self.encoder(fnums)
+        ewords = []
+        beam_state = [[[self.evocab.numberize('<BOS>')], self.decoder.start(fencs), 0]]
+        for _ in range(max_len-1):
+            new_beam_state = []
+            for i in range(len(beam_state)):
+                sentence, state, prob = beam_state[i]
+                if (sentence[-1]) == self.evocab.numberize('<EOS>'): 
+                    new_beam_state.append(beam_state[i])
+                    continue
+                enum = sentence[-1]
+                (state, elogprobs) = self.decoder.step(state, enum)
+                words, indices = torch.topk(elogprobs, self.beam_k)
+                for j in range(self.beam_k):
+                    new_beam_state.append([sentence + [indices[j].item()], state, prob + words[j]])
+            beam_state = new_beam_state
+            beam_state.sort(reverse=True, key=lambda x: x[2])
+            beam_state = beam_state[:self.beam_k]
+        #for sentence, state, prob in beam_state:
+        #    print([self.evocab.denumberize(x) for x in sentence], prob)
+        return [self.evocab.denumberize(x) for x in random.choice(beam_state)[0]]
+
 def train(train_data, dev_data):
     fvocab = Vocab()
     evocab = Vocab()
@@ -166,15 +220,13 @@ def train(train_data, dev_data):
         fvocab |= fwords
         evocab |= ewords
 
-    model = Model(fvocab, 256, evocab) # try other values
+    model = Model(fvocab, 256, evocab) 
     
     opt = torch.optim.Adam(model.parameters(), lr=0.0003)
 
     best_dev_bleu = None
     for epoch in range(20):
         random.shuffle(train_data)
-
-        ### Update model on train
 
         train_loss = 0.
         train_ewords = 0
@@ -186,17 +238,15 @@ def train(train_data, dev_data):
             train_loss += loss.item()
             train_ewords += len(ewords)-1 # includes EOS but not BOS
 
-        ### Validate on dev set and print out a few translations
-
         dev_loss = 0.
         dev_ewords = 0
         dev_outputs = []
         print("Predicting the first 10 words:")
-        for line_num, (fwords, ewords) in enumerate(dev_data):
+        for line_num, (fwords, ewords) in enumerate(progress(dev_data)):
             dev_loss -= model.logprob(fwords, ewords).item()
             dev_ewords += len(ewords)-1 # includes EOS but not BOS
 
-            output = model.translate(fwords)
+            output = model.translate_beam(fwords)
             dev_outputs.append(output)
             if line_num < 10:
                 print(str(line_num) + ": " + ' '.join(output), file=sys.stderr, flush=True)
@@ -207,6 +257,7 @@ def train(train_data, dev_data):
         if best_dev_bleu is None or dev_bleu > best_dev_bleu:
             best_model = copy.deepcopy(model)
             best_dev_bleu = dev_bleu
+            torch.save(model, f"../model_{epoch+1}.pt")
 
         print(f'[{epoch+1}] train_loss={train_loss} train_ppl={math.exp(train_loss/train_ewords)} dev_ppl={math.exp(dev_loss/dev_ewords)} dev_bleu={dev_bleu}', file=sys.stderr, flush=True)
 
@@ -219,12 +270,12 @@ if __name__ == "__main__":
          f.readline()
          for line in f:
              toxic, nontoxic = line.strip().split("\t")
-             train_data.append((toxic, nontoxic))
-    dev_data = train_data[19744-19744//5:]
-    train_data = train_data[:19744-19744//5]
+             train_data.append((["<BOS>"] + word_tokenize(toxic) + ["<EOS>"], ["<BOS>"] + word_tokenize(nontoxic) + ["<EOS>"]))
+    dev_train_split = 19744-19744//5
+    dev_data = train_data[dev_train_split:]
+    train_data = train_data[:dev_train_split]
     model = train(train_data, dev_data)
     
     #model = torch.load(os.path.join(out_dir, 'mymodel.pt'))
-    #torch.save(model, os.path.join(out_dir, 'mymodel.pt'))
-
+    
     #print(f'[done] test_bleu={bleu.score(test_outputs, test_refs)}')
