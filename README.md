@@ -3,6 +3,11 @@ by John Lee and David Simonetti
 
 In this project, we train a Transformer to detoxify sentences containing toxicity while attempting to preserve its meaning.
 
+## [Poster]
+
+## [Paper]
+
+
 ## Data
 
 #### [Paradetox](https://huggingface.co/datasets/s-nlp/paradetox) - Parallel Detoxification Data
@@ -23,8 +28,28 @@ This dataset is a curated list of known toxic words. It contains pure curse word
 
 ## Setup
 
+The setup is rather involved.
+
+```
+1. Create a virtual environment
+2. pip install -f requirements.txt (Some requirements, such as pytorch, may require manual installation depending on the machine)
+3. git clone https://github.com/unitaryai/detoxify
+4. pip install -e detoxify (For the Toxicity detection module)
+5. source setup.sh (to initialize all paths)
+```
+
+## Running Code
+
+### Baseline
+
+#### Results
+Baseline results are achieved from `python scripts/get_baseline.py <all|toxic|nontoxic>`. 
+
+#### Demonstration
+For a simple command line demonstration, run `python scripts/demo_baseline.py`.
+
+### SmartCensor
 
 
-## Running
 
 
