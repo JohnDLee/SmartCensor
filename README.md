@@ -46,9 +46,27 @@ The setup is rather involved.
 Baseline results are achieved from `python scripts/get_baseline.py <all|toxic|nontoxic>`. 
 
 #### Demonstration
-For a simple command line demonstration, run `python scripts/demo_baseline.py`.
+For a simple command line demonstration, run `python scripts/demo_baseline.py`. Input is taken from stdin and the detoxified output is printed back out.
 
-### SmartCensor
+### SmartCensor (Detoxifier)
+
+#### Training
+Training the detoxifier can be done from `python scripts/encoder_decoder.py train`. If cuda is not available, please swap to cpu in the code.
+
+#### Results
+Test results are achieved from `python scripts/encoder_decoder.py test -model <model_path>`. We have trained a model under `models_detoxifier/model_10.pt` that performs decently. It may require cuda to be loaded.
+
+#### Demonstration
+For a simple command line demonstration, run `python scripts/encoder_decoder.py demo -model <model_path>`. The same model as in results may be used.
+
+### Toxifier
+To be trained
+
+#### Training
+Training a toxifier can be done via `python scripts/encoder_decoder.py train -toxifier`.
+
+#### Demonstration
+For a simple command line demonstration, run `python scripts/encoder_decoder.py demo -model <model_path>`. `models_toxifier/model_10.pt` can be used.
 
 
 
