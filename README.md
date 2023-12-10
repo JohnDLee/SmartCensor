@@ -3,7 +3,7 @@ by John Lee and David Simonetti
 
 In this project, we train a Transformer to detoxify sentences containing toxicity while attempting to preserve its meaning.
 
-## [Poster]
+## [Poster](results/NLP_Poster.pdf)
 
 ## [Paper]
 
