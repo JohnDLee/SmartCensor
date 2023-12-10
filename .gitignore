@@ -161,3 +161,5 @@ cython_debug/
 
 data/jigsaw-toxic-comments/*.txt
 data/jigsaw-toxic-comments/*.csv
+models_detoxifier/*
+models_toxifier/*

@@ -2,11 +2,11 @@
 
 import collections.abc
 
-def progress(iterable):
+def progress(iterable, **kwargs):
     """Iterate over `iterable`, showing progress if appropriate."""
     try:
         import tqdm
-        return tqdm.tqdm(iterable, disable=None)
+        return tqdm.tqdm(iterable,**kwargs)#, disable=None)
     except ImportError:
         return iterable
 

@@ -1,3 +1,5 @@
+# Splits Jigsaw data into different components.
+
 import csv
 from pathlib import Path
 import random
