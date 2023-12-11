@@ -164,3 +164,4 @@ data/jigsaw-toxic-comments/*.csv
 models_detoxifier/*
 models_toxifier/*
 !models_detoxifier/model_10.pt
+!models_toxifier/model_8.pt
