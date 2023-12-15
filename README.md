@@ -67,6 +67,8 @@ Training a toxifier can be done via `python scripts/encoder_decoder.py train -to
 #### Demonstration
 For a simple command line demonstration, run `python scripts/encoder_decoder.py demo -model <model_path>`. `models_toxifier/model_8.pt` can be used.
 
+#### Evaluation
+For a simple command line evaluation of the toxifier, run `python scripts/encoder_decoder.py toxify -model <model_path>`. `models_toxifier/model_8.pt` can be used.
 
 
 

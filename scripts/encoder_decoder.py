@@ -317,6 +317,9 @@ if __name__ == "__main__":
     
     demo_parser = subparsers.add_parser('demo')
     demo_parser.add_argument('-model', help='best model to use')
+
+    demo_parser = subparsers.add_parser('toxify')
+    demo_parser.add_argument('-model', help='toxification model to use')
     
     args = parser.parse_args()
     
@@ -416,3 +419,49 @@ if __name__ == "__main__":
         for line in sys.stdin:
             print("Predicted: " + detoxify(line.rstrip(), model, d), file=sys.stderr, flush=True)
         #print(f'[done] test_bleu={bleu.score(test_outputs, test_refs)}')
+
+    elif args.mode == "toxify":
+        """ Evaluates toxifier on Jigsaw dataset """
+        model = torch.load(args.model)
+        model.eval()
+        
+        ## Load Testing Data
+        baseline_data = JigsawData(JigsawPath.test)
+        zipped_data = baseline_data.get_zipped_data()
+        ## Load Toxic Bert
+        toxic_metric = Detoxify('original')
+        ## Load Sentence embedder
+        sentence_emb = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        
+        print("Models Loaded.")
+        keys = toxic_metric.predict('')
+        reductions = {k: [] for k in keys.keys()}
+        sim = []
+        num_evaluations = 0
+        
+        for id, comment, labels in progress(zipped_data, desc='Cleaning Strings'):
+            # for every toxic word, sub it for empty
+            if sum(labels) != 0:
+                continue
+            
+            toxified_string = detoxify(comment, model, d)
+            ## Oberve Toxicity
+            results = toxic_metric.predict([comment, toxified_string])
+            for k in reductions.keys():
+                reductions[k].append(results[k][1] - results[k][0])
+            
+            
+            ## Observe Sentence Cosine Sim
+            embedding_toxic = sentence_emb.encode(comment, convert_to_tensor=True)
+            embedding_clean = sentence_emb.encode(toxified_string, convert_to_tensor=True)
+            sim.append(util.pytorch_cos_sim(embedding_toxic, embedding_clean).item())
+            num_evaluations += 1
+            if num_evaluations == 999:
+                break
+            
+        ## Average Toxicity Reduction
+        print("Average Reductions in Toxicity:")
+        for k, val in reductions.items():
+            print(f'{k:20} | {sum(val)/len(val):.4f}')
+        
+        print(f"Average Cosine Similarity: {sum(sim)/len(sim):.4f}")
