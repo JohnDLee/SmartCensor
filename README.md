@@ -5,7 +5,7 @@ In this project, we train a Transformer to detoxify sentences containing toxicit
 
 ## [Poster](results/NLP_Poster.pdf)
 
-## [Paper]
+## [Paper](results/NLP_Censoring_Project.pdf)
 
 
 ## Data
